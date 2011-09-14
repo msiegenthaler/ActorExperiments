@@ -1,6 +1,7 @@
 package actor
 package impls
 
+import annotation._
 import execution.ExecutionStrategy
 
 object PureActor extends ActorImplementor {
@@ -40,7 +41,8 @@ object PureActor extends ActorImplementor {
         }
       }
     }
-    private def doWork {
+    
+    @tailrec private def doWork {
       val msg = queue.poll
       if (msg != null) {
         // process msg
