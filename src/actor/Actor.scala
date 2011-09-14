@@ -6,6 +6,7 @@ sealed trait Actor[-M] {
   //accessed only through ActionImplementor#handleAction
   private[actor] def processMessage(msg: M)
   
+  def ![A <: M](msg: A) = Send(this, msg)
   def comap[T](f: T => M): Actor[T] = {
     val a = this
     new Actor[T] {
