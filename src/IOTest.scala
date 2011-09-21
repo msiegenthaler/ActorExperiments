@@ -50,16 +50,12 @@ object IOTest extends MainActor {
       case Empty => wf(buffer) _
       case EOF => done(string(buffer))
     }
+    
     cont(wf(Nil))
   }
 
-  object Charsets {
-    import java.nio._
-
-    def charsetDecoder(charset: String): Iteratee[Byte, Char] = {
-      decode(charset)(new Array(10), 0) _
-    }
-    private def decode(charset: String)(buffer: Array[Byte], len: Int)(in: Input[Byte]): Iteratee[Byte, Char] = in match {
+  def charsetDecoder(charset: String) = {
+    def decode(charset: String)(buffer: Array[Byte], len: Int)(in: Input[Byte]): Iteratee[Byte, Char] = in match {
       case Data(byte) =>
         val nl = len + 1
         val b = if (nl >= buffer.length) new Array[Byte](buffer.length * 2) else buffer
@@ -74,13 +70,13 @@ object IOTest extends MainActor {
       case EOF =>
         done
     }
+
+    cont(decode(charset)(new Array(10), 0))
   }
 
   override def body(args: Array[String]) = {
     Noop
-    
-    
-    
+
   }
 
 }
