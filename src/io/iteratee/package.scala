@@ -17,19 +17,25 @@ package object iteratee {
   }
 
   def compose[I, A, O](a: Iteratee[I, A], b: Iteratee[A, O]): Iteratee[I, O] = {
-    def handle(in: Input[I]): Iteratee[I, O] = {
-      val it = a(in)
-      val bit = it match {
-        case Result(d) =>
-          val bi = b(Data(d))
-          if (it.isDone) bi(EOF)
-          else bi
-        case _: Done => b(EOF)
-        case _ => b(Empty)
-      }
-      compose(it, bit)
+    cont(handleCompose(a, b))
+  }
+  private def handleCompose[I, O, A](a: Iteratee[I, A], b: Iteratee[A, O])(in: Input[I]): Iteratee[I, O] = {
+    val ait = a(in)
+    val bit = ait match {
+      case Result(d) =>
+        val bi = b(Data(d))
+        if (ait.isDone) bi(EOF)
+        else bi
+      case _: Done => b(EOF)
+      case _ => b(Empty)
     }
-    cont(handle)
+    if (bit.isDone) bit match {
+      case Result(r) => done(r)
+      case _ => done
+    } else bit match {
+      case Result(r) => cont(handleCompose(ait, bit), r)
+      case _ => cont(handleCompose(ait, bit))
+    }
   }
 
   implicit def fun2cont[I, O](f: Input[I] => Iteratee[I, O]): Iteratee[I, O] = cont(f)

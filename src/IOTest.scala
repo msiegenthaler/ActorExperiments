@@ -50,7 +50,7 @@ object IOTest extends MainActor {
       case Empty => wf(buffer) _
       case EOF => done(string(buffer))
     }
-    
+
     cont(wf(Nil))
   }
 
@@ -60,12 +60,12 @@ object IOTest extends MainActor {
         val nl = len + 1
         val b = if (nl >= buffer.length) new Array[Byte](buffer.length * 2) else buffer
         buffer(len) = byte
-        val s = new String(buffer, 0, len, charset)
+        val s = new String(buffer, 0, nl, charset)
         if (s.length > 0) {
           val char = s.charAt(0)
           val f = decode(charset)(buffer, 0) _
           cont(f, char)
-        } else decode(charset)(buffer, len) _
+        } else decode(charset)(buffer, nl) _
       case Empty => decode(charset)(buffer, len) _
       case EOF =>
         done
@@ -74,7 +74,34 @@ object IOTest extends MainActor {
     cont(decode(charset)(new Array(10), 0))
   }
 
+  def printlnToConsole = {
+    def print(in: Input[String]): Iteratee[String, Unit] = {
+      in match {
+        case Data(d) => println(d)
+        case Empty => ()
+        case EOF => ()
+      }
+      print _
+    }
+    cont(print)
+  }
+
+  def iterate[E, O](l: List[E])(it: Iteratee[E, O]): Unit = {
+    l match {
+      case e :: t =>
+        val nit = it(Data(e))
+        if (nit.isDone) ()
+        else iterate(t)(nit)
+      case Nil =>
+        it(EOF)
+    }
+  }
+
   override def body(args: Array[String]) = {
+  	val in = "Mario is doing some tests".getBytes("UTF-8").toList
+    val b = charsetDecoder("UTF-8") compose worder compose printlnToConsole
+    iterate(in)(b)
+    
     Noop
 
   }
