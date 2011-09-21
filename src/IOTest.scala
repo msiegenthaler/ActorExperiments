@@ -38,20 +38,28 @@ object IOTest extends MainActor {
       if (!subscribers.compareAndSet(its, nits)) removeSubs(dones)
     }
   }
-
-  def worder(soFar: String)(in: Input[Char]): Result[Char,String] = {
-    //TODO
-    Done("")
-  }
 */
-  
+
+  def worder = {
+    def string(chars: List[Char]) = new String(chars.reverse.toArray)
+    def wf(buffer: List[Char])(in: Input[Char]): Iteratee[Char, String] = in match {
+      case Data(' ') =>
+        if (buffer.isEmpty) wf(Nil) _
+        else cont(wf(Nil), string(buffer))
+      case Data(char) => wf(char :: buffer) _
+      case Empty => wf(buffer) _
+      case EOF => done(string(buffer))
+    }
+    cont(wf(Nil))
+  }
+
   object Charsets {
     import java.nio._
-    
-    def charsetDecoder(charset: String): Iteratee[Byte,Char] = {
+
+    def charsetDecoder(charset: String): Iteratee[Byte, Char] = {
       decode(charset)(new Array(10), 0) _
     }
-    private def decode(charset: String)(buffer: Array[Byte], len: Int)(in: Input[Byte]): Iteratee[Byte,Char] = in match {
+    private def decode(charset: String)(buffer: Array[Byte], len: Int)(in: Input[Byte]): Iteratee[Byte, Char] = in match {
       case Data(byte) =>
         val nl = len + 1
         val b = if (nl >= buffer.length) new Array[Byte](buffer.length * 2) else buffer
@@ -61,8 +69,7 @@ object IOTest extends MainActor {
           val char = s.charAt(0)
           val f = decode(charset)(buffer, 0) _
           cont(f, char)
-        }
-        else decode(charset)(buffer, len) _
+        } else decode(charset)(buffer, len) _
       case Empty => decode(charset)(buffer, len) _
       case EOF =>
         done
@@ -71,6 +78,9 @@ object IOTest extends MainActor {
 
   override def body(args: Array[String]) = {
     Noop
+    
+    
+    
   }
 
 }
