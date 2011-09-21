@@ -1,18 +1,6 @@
-package actor
+package io
 
-package object io {
-  
-  trait Result[+O] {
-  	val out: O
-  }
-  trait Done
-  
-  
-  trait Iteratee[-I,+O] {
-    def apply(in: Input[I]): Iteratee[I,O]
-  }
-  
-  
+package object iteratee {
   def cont[I,O](f: Input[I] => Iteratee[I,O]) = new Iteratee[I,O] {
   	override def apply(in: Input[I]) = f(in)
   }

@@ -1,6 +1,6 @@
 import actor._
 import impls._
-import io._
+import io.iteratee._
 import execution._
 import annotation._
 

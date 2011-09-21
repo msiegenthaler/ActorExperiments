@@ -1,5 +1,5 @@
-package actor
 package io
+package iteratee
 
 sealed trait Input[+E] {
   def isEOF: Boolean
