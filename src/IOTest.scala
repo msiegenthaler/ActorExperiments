@@ -127,6 +127,11 @@ object IOTest extends MainActor {
     
     val it2 = mapping[Byte,Char](_.toChar) compose worder compose printlnToConsole
     iterate(in)(it2)
+    
+    println("--------------")
+    
+    val it3 = charsetDecoder("UTF-8") compose worder compose ActorIteratee(Test.ConsoleActors.SysoutActor)
+    iterate(in)(it3)
 
     Noop
   }
