@@ -44,10 +44,10 @@ object IOTest extends MainActor {
     def string(chars: List[Char]) = new String(chars.reverse.toArray)
     def wf(buffer: List[Char])(in: Input[Char]): Iteratee[Char, String] = in match {
       case Data(' ') =>
-        if (buffer.isEmpty) wf(Nil) _
+        if (buffer.isEmpty) cont(wf(Nil))
         else cont(wf(Nil), string(buffer))
-      case Data(char) => wf(char :: buffer) _
-      case Empty => wf(buffer) _
+      case Data(char) => cont(wf(char :: buffer))
+      case Empty => cont(wf(buffer))
       case EOF => done(string(buffer))
     }
 
@@ -65,8 +65,8 @@ object IOTest extends MainActor {
           val char = s.charAt(0)
           val f = decode(charset)(buffer, 0) _
           cont(f, char)
-        } else decode(charset)(buffer, nl) _
-      case Empty => decode(charset)(buffer, len) _
+        } else cont(decode(charset)(buffer, nl))
+      case Empty => cont(decode(charset)(buffer, len))
       case EOF =>
         done
     }
@@ -81,9 +81,29 @@ object IOTest extends MainActor {
         case Empty => ()
         case EOF => ()
       }
-      print _
+      cont(print)
     }
     cont(print)
+  }
+
+  def endDebugIteratee[A](name: String) = {
+    def handle(in: Input[A]): Iteratee[A, Unit] = {
+      println("Iteratee " + name + ": " + in)
+      cont(handle)
+    }
+    cont(handle)
+  }
+
+  def debug[A](name: String) = {
+    def handle(in: Input[A]): Iteratee[A, A] = {
+      println("Iteratee " + name + ": " + in)
+      in match {
+        case Data(d) => cont(handle, d)
+        case Empty => cont(handle)
+        case EOF => done
+      }
+    }
+    cont(handle)
   }
 
   def iterate[E, O](l: List[E])(it: Iteratee[E, O]): Unit = {
@@ -98,12 +118,11 @@ object IOTest extends MainActor {
   }
 
   override def body(args: Array[String]) = {
-  	val in = "Mario is doing some tests".getBytes("UTF-8").toList
-    val b = charsetDecoder("UTF-8") compose worder compose printlnToConsole
+    val in = "Mario is doing some tests tonight".getBytes("UTF-8").toList
+    val b = charsetDecoder("UTF-8") compose worder compose mapping(_.toUpperCase) compose printlnToConsole
     iterate(in)(b)
-    
-    Noop
 
+    Noop
   }
 
 }
