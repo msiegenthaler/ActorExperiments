@@ -1,25 +1,33 @@
 package io
 
 package object iteratee {
-  def cont[I, O](f: Input[I] => Iteratee[I, O]): ContIteratee[I, O] = new ContIteratee[I, O] {
+  def cont[I, O](f: Input[I] => Iteratee[I, O]) = new Iteratee[I, O] {
     override def apply(in: Input[I]) = f(in)
+    override def isDone = false
+    override def hasResult = false
   }
-  def cont[I, O](f: Input[I] => Iteratee[I, O], o: O) = new ContWithResultIteratee[I, O] {
+  def cont[I, O](f: Input[I] => Iteratee[I, O], o: O) = new Iteratee[I, O] with Result[O] {
     override def apply(in: Input[I]) = f(in)
     override val out = o
+    override def isDone = false
+    override def hasResult = true
   }
-  val done: DoneIteratee = new DoneIteratee {
+  val done: Iteratee[Any, Nothing] with Done = new Iteratee[Any, Nothing] with Done {
     override def apply(in: Input[Any]) = done
+    override def isDone = true
+    override def hasResult = false
   }
-  def done[O](o: O): DoneWithResultIteratee[O] = new DoneWithResultIteratee[O] {
+  def done[O](o: O): Iteratee[Any, O] with Result[O] with Done = new Iteratee[Any, O] with Result[O] with Done {
     override def apply(in: Input[Any]) = done
     override val out = o
+    override def isDone = true
+    override def hasResult = true
   }
 
-  def cont[I, O](data: I => Iteratee[I, O], empty: => Iteratee[I, O], eof: => Iteratee[I, O]): ContIteratee[I, O] =
+  def cont[I, O](data: I => Iteratee[I, O], empty: => Iteratee[I, O], eof: => Iteratee[I, O]): Iteratee[I, O] =
     cont(ips(data, empty, eof))
-  def cont[I, O](data: I => Iteratee[I, O], empty: => Iteratee[I, O], eof: => Iteratee[I, O], o: O): ContIteratee[I, O] =
-    cont(ips(data, empty, eof))
+  def cont[I, O](data: I => Iteratee[I, O], empty: => Iteratee[I, O], eof: => Iteratee[I, O], o: O): Iteratee[I, O] with Result[O] =
+    cont(ips(data, empty, eof), o)
   private def ips[I, O](data: I => Iteratee[I, O], empty: => Iteratee[I, O], eof: => Iteratee[I, O]): Input[I] => Iteratee[I, O] = (in: Input[I]) => in match {
     case Data(d) => data(d)
     case Empty => empty
@@ -46,7 +54,7 @@ package object iteratee {
         case _: Done => compose(done, b(EOF))
         case _ =>
           //optimize away pointless 'Empty' messages
-          val b2 = cont(b.apply) 
+          val b2 = cont(b.apply)
           compose(ait, b2)
       }
     }
@@ -59,7 +67,6 @@ package object iteratee {
       case _ => cont(handle)
     }
   }
-
 
   sealed trait Result[+O] {
     def out: O
@@ -77,63 +84,6 @@ package object iteratee {
     def apply(in: Input[I]): Iteratee[I, O]
     def isDone: Boolean
     def hasResult: Boolean
-    def map[A](f: O => A): Iteratee[I, A]
-    def mapIn[A](f: A => I): Iteratee[A, O]
     def compose[A](it: Iteratee[O, A]) = iteratee.compose(this, it)
   }
-
-  //impls
-  sealed trait ContIteratee[-I, +O] extends Iteratee[I, O] {
-    override def isDone = false
-    override def hasResult = false
-    override def map[A](f: O => A): ContIteratee[I, A] = {
-      val me = this
-      new ContIteratee[I, A] {
-        override def apply(in: Input[I]) = me(in).map(f)
-      }
-    }
-    override def mapIn[A](f: A => I): ContIteratee[A, O] = {
-      val me = this
-      new ContIteratee[A, O] {
-        override def apply(in: Input[A]) = me(in.map(f)).mapIn(f)
-      }
-    }
-  }
-  sealed trait ContWithResultIteratee[-I, +O] extends Iteratee[I, O] with Result[O] {
-    override def isDone = false
-    override def hasResult = true
-    override def map[A](f: O => A): ContWithResultIteratee[I, A] = {
-      val me = this
-      new ContWithResultIteratee[I, A] {
-        override def apply(in: Input[I]) = me(in).map(f)
-        override def out = f(me.out)
-      }
-    }
-    override def mapIn[A](f: A => I): ContWithResultIteratee[A, O] = {
-      val me = this
-      new ContWithResultIteratee[A, O] {
-        override def apply(in: Input[A]) = me(in.map(f)).mapIn(f)
-        override def out = me.out
-      }
-    }
-  }
-  sealed trait DoneIteratee extends Iteratee[Any, Nothing] with Done {
-    override def isDone = true
-    override def hasResult = false
-    override def map[A](f: Nothing => A): DoneIteratee = this
-    override def mapIn[A](f: A => Any): DoneIteratee = this
-  }
-  sealed trait DoneWithResultIteratee[+O] extends Iteratee[Any, O] with Result[O] with Done {
-    override def isDone = true
-    override def hasResult = true
-    override def map[A](f: O => A): DoneWithResultIteratee[A] = {
-      val me = this
-      new DoneWithResultIteratee[A] {
-        override def apply(in: Input[Any]) = this
-        override def out = f(me.out)
-      }
-    }
-    override def mapIn[A](f: A => Any): DoneWithResultIteratee[O] = this
-  }
-
 }

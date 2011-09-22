@@ -119,8 +119,14 @@ object IOTest extends MainActor {
 
   override def body(args: Array[String]) = {
     val in = "Mario is doing some tests tonight".getBytes("UTF-8").toList
-    val b = charsetDecoder("UTF-8") compose worder compose mapping(_.toUpperCase) compose printlnToConsole
-    iterate(in)(b)
+    
+    val it1 = charsetDecoder("UTF-8") compose worder compose mapping(_.toUpperCase) compose printlnToConsole
+    iterate(in)(it1)
+    
+    println("--------------")
+    
+    val it2 = mapping[Byte,Char](_.toChar) compose worder compose printlnToConsole
+    iterate(in)(it2)
 
     Noop
   }
