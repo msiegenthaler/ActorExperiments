@@ -15,8 +15,8 @@ object ActorIteratee extends ActorImplementor {
         case Empty => ()
         case EOF => ()
       }
-      iteratee.cont(handle)
+      Iteratee.cont(handle)
     }
-    iteratee.cont(handle)
+    Iteratee.cont(handle)
   }
 }
