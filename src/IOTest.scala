@@ -54,8 +54,17 @@ object IOTest extends MainActor {
     object Writer {
       val actor: Actor[String] = new ActorImpl[String] {
         override def processMessage(m: String) = {
-          System.out.println(m)
+          queue offer m
           Noop
+        }
+      }
+
+      private val queue = new java.util.concurrent.LinkedBlockingQueue[String]
+      start
+      private def start = Thread {
+        while (true) {
+          val line = queue.take
+          println(line)
         }
       }
     }
@@ -156,7 +165,7 @@ object IOTest extends MainActor {
     iterate(in)(it3)
 
     println("--------------")
-    
+
     println("Enter input: ")
     val consoleIt = charsetDecoder("UTF-8") compose worder compose sendTo(Console.Writer.actor)
     Console.Reader.actor ! consoleIt
