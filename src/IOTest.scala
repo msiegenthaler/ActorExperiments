@@ -5,50 +5,70 @@ import Iteratee._
 import IterateeFun._
 import execution._
 import annotation._
+import IterateeActor._
 
 object IOTest extends MainActor {
 
-  /*
   object Console extends ActorImplementor {
-    val reader = new ActorImpl[Iteratee[Byte]] {
-      @tailrec override def processMessage(i: Iteratee[Byte]) = {
-        val its = subscribers.get
-        val nits = i :: its
-        if (!subscribers.compareAndSet(its, nits)) processMessage(i)
-      }
-    }
 
-    private val subscribers = new java.util.concurrent.atomic.AtomicReference[List[Iteratee[Byte]]](Nil)
+    object Reader {
+      private type Subscribers = List[ActionIteratee[Byte]]
+      private val newSubscribers = new java.util.concurrent.atomic.AtomicReference[Subscribers](Nil)
 
-    start
-    def start = Thread {
-      while (true) {
-        val in = System.in.read
-        val b = if (in == -1) EOF else Data(in.toByte)
-
-        val dones = subscribers.get.filter { it =>
-          val r = it(b)
-          handleAction(r.msgs)
-          r.isDone
+      val actor: Actor[ActionIteratee[Byte]] = {
+        new ActorImpl[ActionIteratee[Byte]] {
+          @tailrec override def processMessage(it: ActionIteratee[Byte]) = {
+            val subs = newSubscribers.get
+            if (!newSubscribers.compareAndSet(subs, it :: subs)) processMessage(it)
+          }
         }
-        removeSubs(dones)
+      }
+
+      @tailrec private def fetchNewSubscribers: Subscribers = {
+        val subs = newSubscribers.get
+        if (!subs.isEmpty && !newSubscribers.compareAndSet(subs, Nil)) fetchNewSubscribers
+        else subs
+      }
+
+      start
+      private def start = {
+        val reader = System.in
+
+        @tailrec def handle(data: Input[Byte])(left: Subscribers, handled: Subscribers = Nil): Subscribers = left match {
+          case it :: l =>
+            val nit = it(data)
+            nit.outOption.foreach(handleAction)
+            handle(data)(l, nit :: handled)
+          case Nil => handled //let's not reverse, since we don't guarantee order anyway
+        }
+        @tailrec def run(subs: Subscribers) {
+          val in = reader.read
+          val data = if (in == -1) EOF else Data(in.toByte)
+          val nsubs = handle(data)(fetchNewSubscribers ::: subs)
+          run(nsubs)
+        }
+        Thread(run(Nil))
       }
     }
-    @tailrec private def removeSubs(dones: List[Iteratee[Byte]]) {
-      val its = subscribers.get
-      val nits = its.filterNot(dones.contains)
-      if (!subscribers.compareAndSet(its, nits)) removeSubs(dones)
+
+    object Writer {
+      val actor: Actor[String] = new ActorImpl[String] {
+        override def processMessage(m: String) = {
+          System.out.println(m)
+          Noop
+        }
+      }
     }
   }
-*/
 
   def worder = {
     def string(chars: List[Char]) = new String(chars.reverse.toArray)
     def wf(buffer: List[Char])(in: Input[Char]): Iteratee[Char, String] = in match {
-      case Data(' ') =>
+      case Data(char) if char.isWhitespace =>
         if (buffer.isEmpty) cont(wf(Nil))
         else cont(wf(Nil), string(buffer))
-      case Data(char) => cont(wf(char :: buffer))
+      case Data(char) =>
+        cont(wf(char :: buffer))
       case Empty => cont(wf(buffer))
       case EOF => done(string(buffer))
     }
@@ -121,21 +141,25 @@ object IOTest extends MainActor {
 
   override def body(args: Array[String]) = {
     val in = "Mario is doing some tests tonight".getBytes("UTF-8").toList
-    
+
     val it1 = charsetDecoder("UTF-8") compose worder compose mapping(_.toUpperCase) compose printlnToConsole
     iterate(in)(it1)
-    
+
     println("--------------")
-    
-    val it2 = mapping[Byte,Char](_.toChar) compose worder compose printlnToConsole
+
+    val it2 = mapping[Byte, Char](_.toChar) compose worder compose printlnToConsole
     iterate(in)(it2)
-    
+
     println("--------------")
-    
-    val it3 = charsetDecoder("UTF-8") compose worder compose ActorIteratee(Test.ConsoleActors.SysoutActor)
+
+    val it3 = charsetDecoder("UTF-8") compose worder compose ActorIteratee(Console.Writer.actor)
     iterate(in)(it3)
 
-    Noop
+    println("--------------")
+    
+    println("Enter input: ")
+    val consoleIt = charsetDecoder("UTF-8") compose worder compose sendTo(Console.Writer.actor)
+    Console.Reader.actor ! consoleIt
   }
 
 }
