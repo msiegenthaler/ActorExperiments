@@ -4,8 +4,10 @@ package iteratee
 import Iteratee._
 
 object IterateeFun {
+  /** Does nothing. Usually only useful at the beginning of an iteratee chain. */
   def unit[A]: Iteratee[A, A] = mapping(a ⇒ a)
 
+  /** Applies f to each element received and then pass it on */
   def mapping[A, B](f: A ⇒ B): Iteratee[A, B] = {
     def handle(in: Input[A]): Iteratee[A, B] = in match {
       case Data(d) ⇒ cont(handle, f(d))
@@ -15,6 +17,21 @@ object IterateeFun {
     cont(handle)
   }
 
+  /** Outputs each elements of the inputed Traversable as an own element. */
+  def traverse[A]: Iteratee[Traversable[A], A] = {
+    def trav(next: Iteratee[Traversable[A], A], t: Traversable[A]): Iteratee[Traversable[A], A] = {
+      if (t.isEmpty) next
+      else callAgain(_ ⇒ trav(next, t.tail), t.head)
+    }
+    def handle(in: Input[Traversable[A]]): Iteratee[Traversable[A], A] = in match {
+      case Data(t) ⇒ trav(cont(handle), t)
+      case Empty   ⇒ cont(handle)
+      case EOF     ⇒ done
+    }
+    cont(handle)
+  }
+
+  /** Only forward to first n elements. */
   def take[A](n: Long): Iteratee[A, A] = {
     def handle(n: Long)(in: Input[A]): Iteratee[A, A] = in match {
       case Data(d) if n > 1  ⇒ cont(handle(n - 1), d)
@@ -26,6 +43,7 @@ object IterateeFun {
     cont(handle(n))
   }
 
+  /** Don't forward the first n elements. */
   def drop[A](n: Long): Iteratee[A, A] = {
     def handle(n: Long)(in: Input[A]): Iteratee[A, A] = in match {
       case Data(d) if n > 0 ⇒ cont(handle(n - 1))
@@ -36,7 +54,9 @@ object IterateeFun {
     cont(handle(n))
   }
 
+  /** Forwards only the last element. */
   def last[A] = tail(1)
+  /** Forwards only the last n elements. Warning: Up to n elements are kept in memory */
   def tail[A](n: Int): Iteratee[A, A] = {
     import collection.immutable.Queue
     def handle(q: Queue[A], ql: Int)(in: Input[A]): Iteratee[A, Traversable[A]] = in match {
@@ -48,6 +68,7 @@ object IterateeFun {
     cont(handle(Queue(), 0)) |> traverse
   }
 
+  /** Forwards the number of elements received so far on each element received. Often used as count |> last */
   def count[A]: Iteratee[A, Long] = {
     def handle(n: Int)(in: Input[A]): Iteratee[A, Long] = in match {
       case Data(_) ⇒ cont(handle(n + 1), n)
@@ -93,19 +114,5 @@ object IterateeFun {
       case Done(b) ⇒
         doneOption[O](out)
     }
-  }
-
-  /** Outputs each elements of the inputed Traversable as an own element. */
-  def traverse[A]: Iteratee[Traversable[A], A] = {
-    def trav(next: Iteratee[Traversable[A], A], t: Traversable[A]): Iteratee[Traversable[A], A] = {
-      if (t.isEmpty) next
-      else callAgain(_ ⇒ trav(next, t.tail), t.head)
-    }
-    def handle(in: Input[Traversable[A]]): Iteratee[Traversable[A], A] = in match {
-      case Data(t) ⇒ trav(cont(handle), t)
-      case Empty   ⇒ cont(handle)
-      case EOF     ⇒ done
-    }
-    cont(handle)
   }
 }
