@@ -105,11 +105,12 @@ object IOTest extends MainActor {
   def printlnToConsole = {
     def print(in: Input[String]): Iteratee[String, Unit] = {
       in match {
-        case Data(d) ⇒ println(d)
-        case Empty   ⇒ ()
-        case EOF     ⇒ ()
+        case Data(d) ⇒
+          println(d)
+          cont(print)
+        case Empty ⇒ cont(print)
+        case EOF   ⇒ done
       }
-      cont(print)
     }
     cont(print)
   }
@@ -135,18 +136,18 @@ object IOTest extends MainActor {
   }
 
   def iterate[E, O](l: List[E])(it: Iteratee[E, O]): Unit = {
-    l match {
-      case e :: t ⇒
-        val nit = it(Data(e))
-        if (nit.isDone) ()
-        else iterate(t)(nit)
-      case Nil ⇒
-        it(EOF)
+    val (in, t) = l match {
+      case e :: t ⇒ (Data(e), t)
+      case Nil    ⇒ (EOF, Nil)
     }
+    val nit = it(in)
+    if (nit.isDone) { println("done"); () }
+    else iterate(t)(nit)
   }
 
   override def body(args: Array[String]) = {
-    val in = "Mario is doing some tests tonight".getBytes("UTF-8").toList
+    val text = "Mario is doing some tests tonight"
+    val in = text.getBytes("UTF-8").toList
 
     val it1 = charsetDecoder("UTF-8") compose worder compose mapping(_.toUpperCase) compose printlnToConsole
     iterate(in)(it1)
@@ -158,7 +159,7 @@ object IOTest extends MainActor {
 
     println("--------------")
 
-    val it3 = charsetDecoder("UTF-8") compose worder compose ActorIteratee(Console.Writer.actor)
+    val it3 = charsetDecoder("UTF-8") compose worder compose ActorIteratee (Console.Writer.actor)
     iterate(in)(it3)
 
     println("--------------")

@@ -2,6 +2,7 @@ package io
 package iteratee
 
 import actor._
+import Iteratee._
 
 object ActorIteratee extends ActorImplementor {
 
@@ -10,12 +11,13 @@ object ActorIteratee extends ActorImplementor {
   def apply[M](to: Actor[M]) = {
     def handle(in: Input[M]): Iteratee[M, Unit] = {
       in match {
-        case Data(d) ⇒ handleAction(Send(to, d))
-        case Empty   ⇒ ()
-        case EOF     ⇒ ()
+        case Data(d) ⇒
+          handleAction(Send(to, d))
+          cont(handle)
+        case Empty ⇒ cont(handle)
+        case EOF   ⇒ done
       }
-      Iteratee.cont(handle)
     }
-    Iteratee.cont(handle)
+    cont(handle)
   }
 }
