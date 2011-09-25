@@ -1,6 +1,7 @@
 package io
 package iteratee
 
+import annotation._
 import Iteratee._
 
 object IterateeFun {
@@ -84,7 +85,7 @@ object IterateeFun {
       case na @ Result(data) ⇒ compose(na, b(Data(data)), true)
       case na                ⇒ compose(na, b, false)
     }
-    def handleCallAgainA(a: CallAgain[I, A], b: Cont[A, O])(in: NoDataInput): Iteratee[I, O] = a(Empty) match {
+    def handleCallAgainA(a: CallAgain[I, A], b: Cont[A, O])(in: NoDataInput): Iteratee[I, O] = a(in) match {
       case na @ Result(data) ⇒ compose(na, b(Data(data)), true)
       case na                ⇒ compose(na, b, false)
     }
@@ -96,17 +97,20 @@ object IterateeFun {
       }
       callAgainOption(handle(b), b.outOption)
     }
+    def handleDoneA(b: Cont[A, O])(in: NoDataInput): Iteratee[I, O] = {
+      assert(in.isEOF, "invalid input, expected EOF but received " + in)
+      compose(done, b(EOF))
+    }
     def emptyA(in: NoDataInput): Iteratee[I, A] = in match {
       case EOF   ⇒ callAgain(emptyA)
       case Empty ⇒ callAgain(emptyA)
     }
-
     val out = if (preserveOut) b.outOption else None
     b match {
       case Cont(b) ⇒ a match {
         case Cont(a)      ⇒ contOption(handleCont(a, b) _, out)
         case CallAgain(a) ⇒ callAgainOption(handleCallAgainA(a, b) _, out)
-        case Done(a)      ⇒ doneOption[O](out)
+        case Done(a)      ⇒ callAgainOption(handleDoneA(b) _, out)
       }
       case CallAgain(b) ⇒
         //special mode a that just passes through empty/eof until b is ready again
