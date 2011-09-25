@@ -36,6 +36,18 @@ object IterateeFun {
     cont(handle(n))
   }
 
+  def last[A] = tail(1)
+  def tail[A](n: Int): Iteratee[A, A] = {
+    import collection.immutable.Queue
+    def handle(q: Queue[A], ql: Int)(in: Input[A]): Iteratee[A, Traversable[A]] = in match {
+      case Data(d) if ql < n ⇒ cont(handle(q enqueue d, ql + 1))
+      case Data(d)           ⇒ cont(handle(q.dequeue._2 enqueue d, n))
+      case Empty             ⇒ cont(handle(q, ql))
+      case EOF               ⇒ done(q)
+    }
+    cont(handle(Queue(), 0)).traverse
+  }
+
   def count[A]: Iteratee[A, Long] = {
     def handle(n: Int)(in: Input[A]): Iteratee[A, Long] = in match {
       case Data(_) ⇒ cont(handle(n + 1), n)
@@ -45,7 +57,7 @@ object IterateeFun {
     cont(handle(0))
   }
 
-  /** Inputs the result of Iteratee a into Iteratee b thereby combining their processing */ 
+  /** Inputs the result of Iteratee a into Iteratee b thereby combining their processing */
   def compose[I, O, A](a: Iteratee[I, A], b: Iteratee[A, O], preserveOut: Boolean = true): Iteratee[I, O] = {
     def handleCont(a: Cont[I, A], b: Cont[A, O])(in: Input[I]): Iteratee[I, O] = a(in) match {
       case na @ Result(data) ⇒ compose(na, b(Data(data)), true)
@@ -83,7 +95,7 @@ object IterateeFun {
     }
   }
 
-  /** Outputs each elements of the inputed Traversable as an own element. */ 
+  /** Outputs each elements of the inputed Traversable as an own element. */
   def traverse[I, O](it: Iteratee[I, Traversable[O]]): Iteratee[I, O] = {
     def trav(next: Iteratee[I, Traversable[O]], t: Traversable[O]): Iteratee[I, O] = {
       if (t.isEmpty) traverse(next)
