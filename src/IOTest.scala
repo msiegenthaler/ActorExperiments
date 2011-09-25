@@ -35,9 +35,13 @@ object IOTest extends MainActor {
 
         @tailrec def handle(data: Input[Byte])(left: Subscribers, handled: Subscribers = Nil): Subscribers = left match {
           case it :: l ⇒
-            val nit = it(data)
-            nit.outOption.foreach(handleAction)
-            handle(data)(l, nit :: handled)
+            val next = it match {
+              case Cont(c)      ⇒ c(data)
+              case CallAgain(c) ⇒ c(Empty)
+              case Done(_)      ⇒ done
+            }
+            next.outOption.foreach(handleAction)
+            handle(data)(l, next :: handled)
           case Nil ⇒ handled //let's not reverse, since we don't guarantee order anyway
         }
         @tailrec def run(subs: Subscribers) {
@@ -79,7 +83,6 @@ object IOTest extends MainActor {
       case Empty      ⇒ cont(wf(buffer))
       case EOF        ⇒ done(string(buffer))
     }
-
     cont(wf(Nil))
   }
 
@@ -135,14 +138,14 @@ object IOTest extends MainActor {
     cont(handle)
   }
 
-  def iterate[E, O](l: List[E])(it: Iteratee[E, O]): Unit = {
-    val (in, t) = l match {
-      case e :: t ⇒ (Data(e), t)
-      case Nil    ⇒ (EOF, Nil)
-    }
-    val nit = it(in)
-    if (nit.isDone) ()
-    else iterate(t)(nit)
+  @tailrec def iterate[E, O](l: List[E])(it: Iteratee[E, O]): Unit = it match {
+    case Cont(c) ⇒
+      l match {
+        case e :: t ⇒ iterate(t)(c(Data(e)))
+        case Nil    ⇒ iterate[E, O](Nil)(c(EOF))
+      }
+    case CallAgain(c) ⇒ iterate(l)(c(Empty))
+    case Done(_)      ⇒ ()
   }
 
   override def body(args: Array[String]) = {
