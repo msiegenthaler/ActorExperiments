@@ -10,7 +10,6 @@ import IterateeActor._
 object IOTest extends MainActor {
 
   object Console extends ActorImplementor {
-
     object Reader {
       private type Subscribers = List[ActionIteratee[Byte]]
       private val newSubscribers = new java.util.concurrent.atomic.AtomicReference[Subscribers](Nil)
@@ -35,11 +34,11 @@ object IOTest extends MainActor {
         val reader = System.in
 
         @tailrec def handle(data: Input[Byte])(left: Subscribers, handled: Subscribers = Nil): Subscribers = left match {
-          case it :: l =>
+          case it :: l ⇒
             val nit = it(data)
             nit.outOption.foreach(handleAction)
             handle(data)(l, nit :: handled)
-          case Nil => handled //let's not reverse, since we don't guarantee order anyway
+          case Nil ⇒ handled //let's not reverse, since we don't guarantee order anyway
         }
         @tailrec def run(subs: Subscribers) {
           val in = reader.read
@@ -73,13 +72,12 @@ object IOTest extends MainActor {
   def worder = {
     def string(chars: List[Char]) = new String(chars.reverse.toArray)
     def wf(buffer: List[Char])(in: Input[Char]): Iteratee[Char, String] = in match {
-      case Data(char) if char.isWhitespace =>
+      case Data(char) if char.isWhitespace ⇒
         if (buffer.isEmpty) cont(wf(Nil))
         else cont(wf(Nil), string(buffer))
-      case Data(char) =>
-        cont(wf(char :: buffer))
-      case Empty => cont(wf(buffer))
-      case EOF => done(string(buffer))
+      case Data(char) ⇒ cont(wf(char :: buffer))
+      case Empty      ⇒ cont(wf(buffer))
+      case EOF        ⇒ done(string(buffer))
     }
 
     cont(wf(Nil))
@@ -87,7 +85,7 @@ object IOTest extends MainActor {
 
   def charsetDecoder(charset: String) = {
     def decode(charset: String)(buffer: Array[Byte], len: Int)(in: Input[Byte]): Iteratee[Byte, Char] = in match {
-      case Data(byte) =>
+      case Data(byte) ⇒
         val nl = len + 1
         val b = if (nl >= buffer.length) new Array[Byte](buffer.length * 2) else buffer
         buffer(len) = byte
@@ -97,9 +95,8 @@ object IOTest extends MainActor {
           val f = decode(charset)(buffer, 0) _
           cont(f, char)
         } else cont(decode(charset)(buffer, nl))
-      case Empty => cont(decode(charset)(buffer, len))
-      case EOF =>
-        done
+      case Empty ⇒ cont(decode(charset)(buffer, len))
+      case EOF   ⇒ done
     }
 
     cont(decode(charset)(new Array(10), 0))
@@ -108,9 +105,9 @@ object IOTest extends MainActor {
   def printlnToConsole = {
     def print(in: Input[String]): Iteratee[String, Unit] = {
       in match {
-        case Data(d) => println(d)
-        case Empty => ()
-        case EOF => ()
+        case Data(d) ⇒ println(d)
+        case Empty   ⇒ ()
+        case EOF     ⇒ ()
       }
       cont(print)
     }
@@ -129,9 +126,9 @@ object IOTest extends MainActor {
     def handle(in: Input[A]): Iteratee[A, A] = {
       println("Iteratee " + name + ": " + in)
       in match {
-        case Data(d) => cont(handle, d)
-        case Empty => cont(handle)
-        case EOF => done
+        case Data(d) ⇒ cont(handle, d)
+        case Empty   ⇒ cont(handle)
+        case EOF     ⇒ done
       }
     }
     cont(handle)
@@ -139,11 +136,11 @@ object IOTest extends MainActor {
 
   def iterate[E, O](l: List[E])(it: Iteratee[E, O]): Unit = {
     l match {
-      case e :: t =>
+      case e :: t ⇒
         val nit = it(Data(e))
         if (nit.isDone) ()
         else iterate(t)(nit)
-      case Nil =>
+      case Nil ⇒
         it(EOF)
     }
   }

@@ -41,7 +41,7 @@ object PureActor extends ActorImplementor {
         }
       }
     }
-    
+
     @tailrec private def doWork {
       val msg = queue.poll
       if (msg != null) {

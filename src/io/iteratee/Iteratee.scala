@@ -7,8 +7,8 @@ sealed trait Result[+O] {
 }
 object Result {
   def unapply[I, O](it: Iteratee[I, O]) = it match {
-    case r: Result[O] => Some(r.out)
-    case _ => None
+    case r: Result[O] ⇒ Some(r.out)
+    case _            ⇒ None
   }
 }
 
@@ -25,11 +25,11 @@ sealed trait Iteratee[-I, +O] {
 }
 
 object Iteratee {
-  def cont[I, O](f: Input[I] => Iteratee[I, O]): Iteratee[I, O] = new Iteratee[I, O] with NoResult[O] {
+  def cont[I, O](f: Input[I] ⇒ Iteratee[I, O]): Iteratee[I, O] = new Iteratee[I, O] with NoResult[O] {
     override def apply(in: Input[I]) = f(in)
     override def isDone = false
   }
-  def cont[I, O](f: Input[I] => Iteratee[I, O], o: O): Iteratee[I, O] with Result[O] = new Iteratee[I, O] with Result[O] {
+  def cont[I, O](f: Input[I] ⇒ Iteratee[I, O], o: O): Iteratee[I, O] with Result[O] = new Iteratee[I, O] with Result[O] {
     override def apply(in: Input[I]) = f(in)
     override val out = o
     override def isDone = false
@@ -46,14 +46,14 @@ object Iteratee {
     override def hasResult = true
   }
 
-  def cont[I, O](data: I => Iteratee[I, O], empty: => Iteratee[I, O], eof: => Iteratee[I, O]): Iteratee[I, O] =
+  def cont[I, O](data: I ⇒ Iteratee[I, O], empty: ⇒ Iteratee[I, O], eof: ⇒ Iteratee[I, O]): Iteratee[I, O] =
     cont(ips(data, empty, eof))
-  def cont[I, O](data: I => Iteratee[I, O], empty: => Iteratee[I, O], eof: => Iteratee[I, O], o: O): Iteratee[I, O] with Result[O] =
+  def cont[I, O](data: I ⇒ Iteratee[I, O], empty: ⇒ Iteratee[I, O], eof: ⇒ Iteratee[I, O], o: O): Iteratee[I, O] with Result[O] =
     cont(ips(data, empty, eof), o)
-  private def ips[I, O](data: I => Iteratee[I, O], empty: => Iteratee[I, O], eof: => Iteratee[I, O]): Input[I] => Iteratee[I, O] = (in: Input[I]) => in match {
-    case Data(d) => data(d)
-    case Empty => empty
-    case EOF => eof
+  private def ips[I, O](data: I ⇒ Iteratee[I, O], empty: ⇒ Iteratee[I, O], eof: ⇒ Iteratee[I, O]): Input[I] ⇒ Iteratee[I, O] = (in: Input[I]) ⇒ in match {
+    case Data(d) ⇒ data(d)
+    case Empty   ⇒ empty
+    case EOF     ⇒ eof
   }
 
   private trait NoResult[O] {

@@ -35,7 +35,7 @@ object Test extends impls.MainActor {
         while (true) {
           val l = readLine
           synchronized {
-            subscribers.foreach(to => handleAction(Send(to, l)))
+            subscribers.foreach(to ⇒ handleAction(Send(to, l)))
           }
         }
       }
@@ -47,7 +47,7 @@ object Test extends impls.MainActor {
   }
 
   object Duplicator {
-    def apply[T](as: Actor[T]*)(implicit s: ExecutionStrategy = Sequential): Actor[T] = spawnStateless[T] { msg =>
+    def apply[T](as: Actor[T]*)(implicit s: ExecutionStrategy = Sequential): Actor[T] = spawnStateless[T] { msg ⇒
       as.map(Send(_, msg))
     }(s)
   }
@@ -55,15 +55,15 @@ object Test extends impls.MainActor {
   object Counter2 {
     def apply(): (Actor[Any], Actor[Actor[Int]]) = {
       val a = spawnPure(body(0))(Pooled)
-      (a.comap(x => Token), a.comap(RequestCount(_)))
+      (a.comap(x ⇒ Token), a.comap(RequestCount(_)))
     }
     private sealed trait Request
     private object Token extends Request
     private case class RequestCount(requestor: Actor[Int]) extends Request
 
     private def body(soFar: Int)(msg: Request): Action[Request] = msg match {
-      case Token => body(soFar + 1) _
-      case RequestCount(r) => r ! soFar
+      case Token           ⇒ body(soFar + 1) _
+      case RequestCount(r) ⇒ r ! soFar
     }
   }
 
@@ -94,21 +94,20 @@ object Test extends impls.MainActor {
     val outCount: Actor[Int] = SysoutActor.comap("Character-Count so far is " + _.toString)
     val outChar: Actor[Char] = SysoutActor.comap("Input was " + _)
 
-    //    val counter = CounterActor.spawn(outCount)
     val (counter, reqCount) = Counter2()
 
     val duplicater = Duplicator(counter, outChar)(Pooled)
 
-    val stringSplitter = spawnStateless[String] { msg =>
+    val stringSplitter = spawnStateless[String] { msg ⇒
       msg.map(Send(duplicater, _))
     }
 
     val in = SysinActor
 
-    val fetchCount = spawnStateless[Unit] { msg =>
+    val fetchCount = spawnStateless[Unit] { msg ⇒
       reqCount ! outCount
     }
-    
+
     (in ! stringSplitter) + (periodic ! Periodic.Subscription(fetchCount, 1000))
   }
 }
