@@ -144,8 +144,9 @@ object IOTest extends MainActor {
         case e :: t ⇒ iterate(t)(c(Data(e)))
         case Nil    ⇒ iterate[E, O](Nil)(c(EOF))
       }
-    case CallAgain(c) ⇒ iterate(l)(c(Empty))
-    case Done(_)      ⇒ ()
+    case CallAgain(c) if l.isEmpty ⇒ iterate(l)(c(EOF))
+    case CallAgain(c)              ⇒ iterate(l)(c(Empty))
+    case Done(_)                   ⇒ ()
   }
 
   override def body(args: Array[String]) = {
@@ -162,12 +163,12 @@ object IOTest extends MainActor {
 
     println("--------------")
 
-    val it3 = debug("in") |> mapping[String, List[Char]](_.toList) |> traverse |> worder |> debug("out") |> printlnToConsole
+    val it3 = debug("in") |> mapping[String, List[Char]](_.toList) |> traverse |> worder |> printlnToConsole
     iterate(List(text))(it3)
 
     println("--------------")
 
-    val it4 = unit[String] |> mapping[String, List[Char]](_.toList) |> traverse |> tail(5) |> mapping(_.toString) |> printlnToConsole
+    val it4 = unit[String] |> mapping(_.toList) |> traverse |> tail(5) |> mapping(_.toString) |> printlnToConsole
     iterate(List(text))(it4)
 
     println("--------------")
