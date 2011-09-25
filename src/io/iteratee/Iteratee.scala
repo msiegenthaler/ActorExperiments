@@ -9,6 +9,7 @@ sealed trait Iteratee[-I, +O] {
   def outOption: Option[O]
 
   def compose[A](it: Iteratee[O, A]) = IterateeFun.compose(this, it)
+  def |>[A](it: Iteratee[O, A]) = compose(it)
 }
 object Iteratee {
   def cont[I, O](f: Input[I] ⇒ Iteratee[I, O]) = ContWithoutResult(f)

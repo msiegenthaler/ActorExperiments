@@ -149,18 +149,18 @@ object IOTest extends MainActor {
     val text = "Mario is doing some tests tonight"
     val in = text.getBytes("UTF-8").toList
 
-    val it1 = charsetDecoder("UTF-8") compose worder compose mapping(_.toUpperCase) compose printlnToConsole
+    val it1 = charsetDecoder("UTF-8") |> worder |> mapping(_.toUpperCase) |> printlnToConsole
     iterate(in)(it1)
 
     println("--------------")
 
-    val it2 = mapping[Byte, Char](_.toChar) compose worder compose printlnToConsole
+    val it2 = mapping[Byte, Char](_.toChar) |> worder |> printlnToConsole
     iterate(in)(it2)
 
     println("--------------")
 
     println("Enter input: ")
-    val consoleIt = charsetDecoder("UTF-8") compose worder compose sendTo(Console.Writer.actor)
+    val consoleIt = charsetDecoder("UTF-8") |> worder |> sendTo(Console.Writer.actor)
     Console.Reader.actor ! consoleIt
   }
 
