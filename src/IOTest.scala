@@ -159,11 +159,6 @@ object IOTest extends MainActor {
 
     println("--------------")
 
-    val it3 = charsetDecoder("UTF-8") compose worder compose ActorIteratee (Console.Writer.actor)
-    iterate(in)(it3)
-
-    println("--------------")
-
     println("Enter input: ")
     val consoleIt = charsetDecoder("UTF-8") compose worder compose sendTo(Console.Writer.actor)
     Console.Reader.actor ! consoleIt
