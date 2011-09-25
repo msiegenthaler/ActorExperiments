@@ -45,7 +45,7 @@ object IterateeFun {
       case Empty             ⇒ cont(handle(q, ql))
       case EOF               ⇒ done(q)
     }
-    cont(handle(Queue(), 0)).traverse
+    cont(handle(Queue(), 0)) |> traverse
   }
 
   def count[A]: Iteratee[A, Long] = {
@@ -96,32 +96,16 @@ object IterateeFun {
   }
 
   /** Outputs each elements of the inputed Traversable as an own element. */
-  def traverse[I, O](it: Iteratee[I, Traversable[O]]): Iteratee[I, O] = {
-    def trav(next: Iteratee[I, Traversable[O]], t: Traversable[O]): Iteratee[I, O] = {
-      if (t.isEmpty) traverse(next)
+  def traverse[A]: Iteratee[Traversable[A], A] = {
+    def trav(next: Iteratee[Traversable[A], A], t: Traversable[A]): Iteratee[Traversable[A], A] = {
+      if (t.isEmpty) next
       else callAgain(_ ⇒ trav(next, t.tail), t.head)
     }
-    def handleCont(it: Cont[I, Traversable[O]])(in: Input[I]): Iteratee[I, O] = it(in) match {
-      case nit @ Result(r) ⇒ trav(nit, r)
-      case nit             ⇒ traverse(nit)
+    def handle(in: Input[Traversable[A]]): Iteratee[Traversable[A], A] = in match {
+      case Data(t) ⇒ trav(cont(handle), t)
+      case Empty   ⇒ cont(handle)
+      case EOF     ⇒ done
     }
-    def handleCallAgain(it: CallAgain[I, Traversable[O]])(in: NoDataInput): Iteratee[I, O] = it(in) match {
-      case nit @ Result(r) ⇒ trav(nit, r)
-      case nit             ⇒ traverse(nit)
-    }
-    it match {
-      case Cont(it)      ⇒ cont(handleCont(it))
-      case CallAgain(it) ⇒ callAgain(handleCallAgain(it))
-      case Done(d) ⇒ d.outOption match {
-        case Some(out) ⇒ trav(done, out)
-        case None      ⇒ done
-      }
-    }
-  }
-  trait TraversableIteratee[I, O] {
-    def traverse(): Iteratee[I, O]
-  }
-  implicit def iterateeToTraversable[I, O](it: Iteratee[I, Traversable[O]]): TraversableIteratee[I, O] = new TraversableIteratee[I, O] {
-    override def traverse() = IterateeFun.traverse(it)
+    cont(handle)
   }
 }

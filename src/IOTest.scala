@@ -162,12 +162,12 @@ object IOTest extends MainActor {
 
     println("--------------")
 
-    val it3 = debug("in") |> mapping[String, List[Char]](_.toList).traverse |> worder |> printlnToConsole
+    val it3 = debug("in") |> mapping[String, List[Char]](_.toList) |> traverse |> worder |> debug("out") |> printlnToConsole
     iterate(List(text))(it3)
 
     println("--------------")
 
-    val it4 = unit[String] |> mapping[String, List[Char]](_.toList).traverse |> tail(5) |> mapping(_.toString) |> printlnToConsole
+    val it4 = unit[String] |> mapping[String, List[Char]](_.toList) |> traverse |> tail(5) |> mapping(_.toString) |> printlnToConsole
     iterate(List(text))(it4)
 
     println("--------------")
