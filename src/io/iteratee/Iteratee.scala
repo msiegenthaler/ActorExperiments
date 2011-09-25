@@ -2,7 +2,6 @@ package io
 package iteratee
 
 sealed trait Iteratee[-I, +O] {
-  //  def apply(in: Input[I]): Iteratee[I, O]
   def isDone: Boolean
   def isContinue: Boolean
   def isCallAgain: Boolean
@@ -14,19 +13,25 @@ sealed trait Iteratee[-I, +O] {
   def |>[A](it: Iteratee[O, A]) = compose(it)
 }
 object Iteratee {
+  /** continue with the next data element. */
   def cont[I, O](f: Input[I] ⇒ Iteratee[I, O]) = ContWithoutResult(f)
+  /** continue with the next data element and return a value. */
   def cont[I, O](f: Input[I] ⇒ Iteratee[I, O], o: O) = ContWithResult(f, o)
   def contOption[I, O](f: Input[I] ⇒ Iteratee[I, O], o: Option[O]) = o match {
     case Some(o) ⇒ cont(f, o)
     case None    ⇒ cont(f)
   }
+  /** have the caller call the iteratee again with no additional data. Used when there is more than one output per input. */
   def callAgain[I, O](f: NoDataInput ⇒ Iteratee[I, O]) = CallAgainWithoutResult(f)
+  /** have the caller call the iteratee again with no additional data and return an ouput. Used when there is more than one output per input */
   def callAgain[I, O](f: NoDataInput ⇒ Iteratee[I, O], o: O) = CallAgainWithResult(f, o)
   def callAgainOption[I, O](f: NoDataInput ⇒ Iteratee[I, O], o: Option[O]) = o match {
     case Some(o) ⇒ callAgain(f, o)
     case None    ⇒ callAgain(f)
   }
+  /** the iteratee is done without a final result */
   def done = DoneWithoutResult
+  /** the iteratee is done with a final result */
   def done[O](o: O) = DoneWithResult(o)
   def doneOption[O](o: Option[O]) = o match {
     case Some(o) ⇒ done(o)

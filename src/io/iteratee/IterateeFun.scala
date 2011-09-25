@@ -45,15 +45,7 @@ object IterateeFun {
     cont(handle(0))
   }
 
-  private def process[I, O](it: Iteratee[I, O], in: Input[I]): Iteratee[I, O] = it match {
-    case Cont(it) ⇒ it(in)
-    case CallAgain(it) ⇒
-      in match {
-        case d: NoDataInput ⇒ it(d)
-        case _              ⇒ throw new AssertionError("invalid input to CallAgain iteratee (" + in + " -> " + it)
-      }
-    case Done(_) ⇒ done
-  }
+  /** Inputs the result of Iteratee a into Iteratee b thereby combining their processing */ 
   def compose[I, O, A](a: Iteratee[I, A], b: Iteratee[A, O], preserveOut: Boolean = true): Iteratee[I, O] = {
     def handleCont(a: Cont[I, A], b: Cont[A, O])(in: Input[I]): Iteratee[I, O] = a(in) match {
       case na @ Result(data) ⇒ compose(na, b(Data(data)), true)
@@ -91,69 +83,33 @@ object IterateeFun {
     }
   }
 
-  //TODO handle a.callAgain
-  //    b match {
-  //      case ContWithResult(_, r)      ⇒ cont(handleCont, r)
-  //      case ContWithoutResult(_)      ⇒ cont(handleCont)
-  //      case CallAgainWithResult(_, r) ⇒ callAgain(handleCallAgain, r)
-  //      case CallAgainWithoutResult(_) ⇒ callAgain(handleCallAgain)
-  //      case DoneWithResult(r)         ⇒ done(r)
-  //      case DoneWithoutResult         ⇒ done
-  //    }
-
-  null
-  //    def doCompose(a: Iteratee[I, A], b: Iteratee[A, O], again: Boolean): Iteratee[I, O] = {
-  //      def handle(in: Input[I]): Iteratee[I, O] = {
-  //        val ait = a(in)
-  //        ait match {
-  //          case ContWithResult(_, d) ⇒ doCompose(ait, b(Data(d)), false)
-  //          case ContWithoutResult(_) ⇒
-  //            if (b.isCallAgain) doCompose(ait, b(Empty), false)
-  //            else doCompose(ait, cont(b.apply), false) //optimize away pointless 'Empty' messages
-  //          case CallAgainWithResult(_, d) ⇒ doCompose(ait, b(Data(d)), true)
-  //          case CallAgainWithoutResult(_) ⇒
-  //            if (b.isCallAgain) doCompose(ait, b(Empty), false)
-  //            else doCompose(ait, cont(b.apply), true) //optimize away pointless 'Empty' messages
-  //          case DoneWithResult(d) ⇒ doCompose(done, b(Data(d)), false)
-  //          case DoneWithoutResult ⇒ doCompose(done, b(EOF), false)
-  //        }
-  //      }
-  //      b match {
-  //        case ContWithResult(_, r)      ⇒ if (again) callAgain(handle, r) else cont(handle, r)
-  //        case ContWithoutResult(_)      ⇒ if (again) callAgain(handle) else cont(handle)
-  //        case CallAgainWithResult(_, r) ⇒ callAgain(handle, r)
-  //        case CallAgainWithoutResult(_) ⇒ callAgain(handle)
-  //        case DoneWithResult(r)         ⇒ done(r)
-  //        case DoneWithoutResult         ⇒ done
-  //      }
-  //    }
-  //    doCompose(a, b, false)
-  //  }
-
-  //  def traverse[I, O](it: Iteratee[I, Traversable[O]]): Iteratee[I, O] = {
-  //    def handle(in: Input[I]): Iteratee[I, O] = {
-  //      it(in) match {
-  //        case nit @ ContWithResult(_, l) ⇒
-  //          process(nit)(l)
-  //      }
-  //      null
-  //    }
-  //    def process(next: Iteratee[I, Traversable[O]])(l: Traversable[O]): Iteratee[I, O] = {
-  //    	if (l.isEmpty) {
-  //    	  traverse(next)
-  //    	} else {
-  //    	  null
-  //    	}
-  //    	null
-  //    }
-  //    
-  //    //TODO
-  //    cont(handle)
-  //  }
-  //  trait TraversableIteratee[I, O] {
-  //    def traverse(): Iteratee[I, O]
-  //  }
-  //  implicit def iterateeToTraversable[I, O](it: Iteratee[I, Traversable[O]]): TraversableIteratee[I, O] = new TraversableIteratee[I, O] {
-  //    override def traverse() = IterateeFun.traverse(it)
-  //  }
+  /** Outputs each elements of the inputed Traversable as an own element. */ 
+  def traverse[I, O](it: Iteratee[I, Traversable[O]]): Iteratee[I, O] = {
+    def trav(next: Iteratee[I, Traversable[O]], t: Traversable[O]): Iteratee[I, O] = {
+      if (t.isEmpty) traverse(next)
+      else callAgain(_ ⇒ trav(next, t.tail), t.head)
+    }
+    def handleCont(it: Cont[I, Traversable[O]])(in: Input[I]): Iteratee[I, O] = it(in) match {
+      case nit @ Result(r) ⇒ trav(nit, r)
+      case nit             ⇒ traverse(nit)
+    }
+    def handleCallAgain(it: CallAgain[I, Traversable[O]])(in: NoDataInput): Iteratee[I, O] = it(in) match {
+      case nit @ Result(r) ⇒ trav(nit, r)
+      case nit             ⇒ traverse(nit)
+    }
+    it match {
+      case Cont(it)      ⇒ cont(handleCont(it))
+      case CallAgain(it) ⇒ callAgain(handleCallAgain(it))
+      case Done(d) ⇒ d.outOption match {
+        case Some(out) ⇒ trav(done, out)
+        case None      ⇒ done
+      }
+    }
+  }
+  trait TraversableIteratee[I, O] {
+    def traverse(): Iteratee[I, O]
+  }
+  implicit def iterateeToTraversable[I, O](it: Iteratee[I, Traversable[O]]): TraversableIteratee[I, O] = new TraversableIteratee[I, O] {
+    override def traverse() = IterateeFun.traverse(it)
+  }
 }

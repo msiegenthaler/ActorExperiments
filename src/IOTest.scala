@@ -162,6 +162,11 @@ object IOTest extends MainActor {
 
     println("--------------")
 
+    val it3 = debug("in") |> mapping[String, List[Char]](_.toList).traverse |> worder |> printlnToConsole
+    iterate(List(text))(it3)
+
+    println("--------------")
+
     println("Enter input: ")
     val consoleIt = charsetDecoder("UTF-8") |> worder |> sendTo(Console.Writer.actor)
     Console.Reader.actor ! consoleIt
