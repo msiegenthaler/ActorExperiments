@@ -141,7 +141,7 @@ object IOTest extends MainActor {
       case Nil    ⇒ (EOF, Nil)
     }
     val nit = it(in)
-    if (nit.isDone) { println("done"); () }
+    if (nit.isDone) ()
     else iterate(t)(nit)
   }
 
