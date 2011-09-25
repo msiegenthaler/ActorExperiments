@@ -1,7 +1,32 @@
 package io
 package iteratee
 
+sealed trait Iteratee[-I, +O] {
+  def apply(in: Input[I]): Iteratee[I, O]
+  def isDone: Boolean
+
+  def hasResult: Boolean
+  def outOption: Option[O]
+
+  def compose[A](it: Iteratee[O, A]) = IterateeFun.compose(this, it)
+}
+object Iteratee {
+  def cont[I, O](f: Input[I] ⇒ Iteratee[I, O]) = ContWithoutResult(f)
+  def cont[I, O](f: Input[I] ⇒ Iteratee[I, O], o: O) = ContWithResult(f, o)
+  def done = DoneWithoutResult
+  def done[O](o: O) = DoneWithResult(o)
+
+  def cont[I, O](data: I ⇒ Iteratee[I, O], empty: ⇒ Iteratee[I, O], eof: ⇒ Iteratee[I, O]) = ContWithoutResult(ips(data, empty, eof))
+  def cont[I, O](data: I ⇒ Iteratee[I, O], empty: ⇒ Iteratee[I, O], eof: ⇒ Iteratee[I, O], o: O) = ContWithResult(ips(data, empty, eof), o)
+  private def ips[I, O](data: I ⇒ Iteratee[I, O], empty: ⇒ Iteratee[I, O], eof: ⇒ Iteratee[I, O]): Input[I] ⇒ Iteratee[I, O] = (in: Input[I]) ⇒ in match {
+    case Data(d) ⇒ data(d)
+    case Empty   ⇒ empty
+    case EOF     ⇒ eof
+  }
+}
+
 sealed trait Result[+O] {
+  def hasResult = true
   def out: O
   def outOption = Some(out)
 }
@@ -12,52 +37,42 @@ object Result {
   }
 }
 
-sealed trait Done
-
-sealed trait Iteratee[-I, +O] {
-  def apply(in: Input[I]): Iteratee[I, O]
-  def isDone: Boolean
-
-  def hasResult: Boolean
-  def outOption: Option[O]
-
-  def compose[A](it: Iteratee[O, A]) = IterateeFun.compose(this, it)
+sealed trait NoResult[O] {
+  def hasResult = false
+  def outOption = None
+}
+object NoResult {
+  def unapply[I, O](it: Iteratee[I, O]) = it match {
+    case r: NoResult[O] ⇒ Some(())
+    case _              ⇒ None
+  }
 }
 
-object Iteratee {
-  def cont[I, O](f: Input[I] ⇒ Iteratee[I, O]): Iteratee[I, O] = new Iteratee[I, O] with NoResult[O] {
-    override def apply(in: Input[I]) = f(in)
-    override def isDone = false
-  }
-  def cont[I, O](f: Input[I] ⇒ Iteratee[I, O], o: O): Iteratee[I, O] with Result[O] = new Iteratee[I, O] with Result[O] {
-    override def apply(in: Input[I]) = f(in)
-    override val out = o
-    override def isDone = false
-    override def hasResult = true
-  }
-  val done: Iteratee[Any, Nothing] with Done = new Iteratee[Any, Nothing] with Done with NoResult[Nothing] {
-    override def apply(in: Input[Any]) = done
-    override def isDone = true
-  }
-  def done[O](o: O): Iteratee[Any, O] with Result[O] with Done = new Iteratee[Any, O] with Result[O] with Done {
-    override def apply(in: Input[Any]) = done
-    override val out = o
-    override def isDone = true
-    override def hasResult = true
-  }
-
-  def cont[I, O](data: I ⇒ Iteratee[I, O], empty: ⇒ Iteratee[I, O], eof: ⇒ Iteratee[I, O]): Iteratee[I, O] =
-    cont(ips(data, empty, eof))
-  def cont[I, O](data: I ⇒ Iteratee[I, O], empty: ⇒ Iteratee[I, O], eof: ⇒ Iteratee[I, O], o: O): Iteratee[I, O] with Result[O] =
-    cont(ips(data, empty, eof), o)
-  private def ips[I, O](data: I ⇒ Iteratee[I, O], empty: ⇒ Iteratee[I, O], eof: ⇒ Iteratee[I, O]): Input[I] ⇒ Iteratee[I, O] = (in: Input[I]) ⇒ in match {
-    case Data(d) ⇒ data(d)
-    case Empty   ⇒ empty
-    case EOF     ⇒ eof
-  }
-
-  private trait NoResult[O] {
-    def hasResult = false
-    def outOption = None
+sealed trait Cont[I, O] extends Iteratee[I, O] {
+  override def isDone = false
+}
+object Cont {
+  def unapply[I, O](it: Iteratee[I, O]) = {
+    if (!it.isDone) Some((it, it.outOption))
+    else None
   }
 }
+case class ContWithResult[I, O](f: Input[I] ⇒ Iteratee[I, O], out: O) extends Cont[I, O] with Result[O] {
+  override def apply(in: Input[I]): Iteratee[I, O] = f(in)
+}
+case class ContWithoutResult[I, O](f: Input[I] ⇒ Iteratee[I, O]) extends Cont[I, O] with NoResult[O] {
+  override def apply(in: Input[I]): Iteratee[I, O] = f(in)
+}
+
+sealed trait Done[O] extends Iteratee[Any, O] {
+  override def apply(in: Input[Any]): Iteratee[Any, O] = this
+  override def isDone = true
+}
+object Done {
+  def unapply[I, O](it: Iteratee[I, O]) = {
+    if (it.isDone) Some(it.outOption)
+    else None
+  }
+}
+case class DoneWithResult[O](out: O) extends Done[O] with Result[O]
+case object DoneWithoutResult extends Done[Nothing] with NoResult[Nothing]

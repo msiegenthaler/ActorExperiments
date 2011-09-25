@@ -17,24 +17,17 @@ object IterateeFun {
     def handle(in: Input[I]): Iteratee[I, O] = {
       val ait = a(in)
       ait match {
-        case Result(d) ⇒
-          val bit = b(Data(d))
-          if (ait.isDone) compose(done, bit)
-          else compose(ait, bit)
-        case _: Done ⇒ compose(done, b(EOF))
-        case _ ⇒
-          //optimize away pointless 'Empty' messages
-          val b2 = cont(b.apply)
-          compose(ait, b2)
+        case DoneWithResult(d)    ⇒ compose(done, b(Data(d)))
+        case ContWithResult(_, d) ⇒ compose(ait, b(Data(d)))
+        case DoneWithoutResult    ⇒ compose(done, b(EOF))
+        case ContWithoutResult(_) ⇒ compose(ait, cont(b.apply)) //optimize away pointless 'Empty' messages
       }
     }
-    if (b.isDone) b match {
-      case Result(r) ⇒ done(r)
-      case _         ⇒ done
-    }
-    else b match {
-      case Result(r) ⇒ cont(handle, r)
-      case _         ⇒ cont(handle)
+    b match {
+      case DoneWithResult(r)    ⇒ done(r)
+      case DoneWithoutResult    ⇒ done
+      case ContWithResult(_, r) ⇒ cont(handle, r)
+      case ContWithoutResult(_) ⇒ cont(handle)
     }
   }
 }
