@@ -79,6 +79,19 @@ object IterateeFun {
     cont(handle(0))
   }
 
+  /**
+   * Collect all elements until an EOF is received, then all elements are released as a List (first received is first in list).
+   * Warning: All elements are kept in memory.
+   */
+  def collect[A]: Iteratee[A, List[A]] = {
+    def handle(soFar: List[A])(in: Input[A]): Iteratee[A, List[A]] = in match {
+      case Data(d) ⇒ cont(handle(d :: soFar))
+      case Empty   ⇒ cont(handle(soFar))
+      case EOF     ⇒ done(soFar.reverse)
+    }
+    cont(handle(Nil))
+  }
+
   /** Inputs the result of Iteratee a into Iteratee b thereby combining their processing */
   def compose[I, O, A](a: Iteratee[I, A], b: Iteratee[A, O], preserveOut: Boolean = true): Iteratee[I, O] = {
     def handleCont(a: Cont[I, A], b: Cont[A, O])(in: Input[I]): Iteratee[I, O] = a(in) match {
