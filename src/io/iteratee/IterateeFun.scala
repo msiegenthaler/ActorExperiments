@@ -56,7 +56,7 @@ object IterateeFun {
   }
 
   /** Forwards only the last element. */
-  def last[A] = tail(1)
+  def last[A] = tail[A](1)
   /** Forwards only the last n elements. Warning: Up to n elements are kept in memory */
   def tail[A](n: Int): Iteratee[A, A] = {
     import collection.immutable.Queue
