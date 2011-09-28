@@ -1,11 +1,11 @@
 import actor._
+import actor.iteratee._
 import impls._
 import io.iteratee._
 import Iteratee._
 import IterateeFun._
 import execution._
 import annotation._
-import IterateeActor._
 
 object IOTest extends MainActor {
 
