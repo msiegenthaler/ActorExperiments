@@ -6,54 +6,11 @@ import Iteratee._
 import IterateeFun._
 import execution._
 import annotation._
+import io.console.ConsoleReader
 
 object IOTest extends MainActor {
 
   object Console extends ActorImplementor {
-    object Reader {
-      private type Subscribers = List[ActionIteratee[Byte]]
-      private val newSubscribers = new java.util.concurrent.atomic.AtomicReference[Subscribers](Nil)
-
-      val actor: Actor[ActionIteratee[Byte]] = {
-        new ActorImpl[ActionIteratee[Byte]] {
-          @tailrec override def processMessage(it: ActionIteratee[Byte]) = {
-            val subs = newSubscribers.get
-            if (!newSubscribers.compareAndSet(subs, it :: subs)) processMessage(it)
-          }
-        }
-      }
-
-      @tailrec private def fetchNewSubscribers: Subscribers = {
-        val subs = newSubscribers.get
-        if (!subs.isEmpty && !newSubscribers.compareAndSet(subs, Nil)) fetchNewSubscribers
-        else subs
-      }
-
-      start
-      private def start = {
-        val reader = System.in
-
-        @tailrec def handle(data: Input[Byte])(left: Subscribers, handled: Subscribers = Nil): Subscribers = left match {
-          case it :: l ⇒
-            val next = it match {
-              case Cont(c)      ⇒ c(data)
-              case CallAgain(c) ⇒ c(Empty)
-              case Done(_)      ⇒ done
-            }
-            next.outOption.foreach(handleAction)
-            handle(data)(l, next :: handled)
-          case Nil ⇒ handled //let's not reverse, since we don't guarantee order anyway
-        }
-        @tailrec def run(subs: Subscribers) {
-          val in = reader.read
-          val data = if (in == -1) EOF else Data(in.toByte)
-          val nsubs = handle(data)(fetchNewSubscribers ::: subs)
-          run(nsubs)
-        }
-        Thread(run(Nil))
-      }
-    }
-
     object Writer {
       val actor: Actor[String] = new ActorImpl[String] {
         override def processMessage(m: String) = {
@@ -172,20 +129,20 @@ object IOTest extends MainActor {
     iterate(List(text))(it4)
 
     println("--------------")
-    
+
     val it5 = charsetDecoder("UTF-8") |> count |> last |> mapping(_.toString) |> printlnToConsole
     iterate(in)(it5)
-    
+
     println("--------------")
 
     val it6 = charsetDecoder("UTF-8") |> worder |> collect |> mapping(_.toString) |> printlnToConsole
     iterate(in)(it6)
-    
+
     println("--------------")
 
     println("Enter input: ")
-    val consoleIt = charsetDecoder("UTF-8") |> worder |> sendTo(Console.Writer.actor)
-    Console.Reader.actor ! consoleIt
+    val consoleIt = unit[String] |> mapping(s ⇒ (s + "\n").toList) |> traverse |> worder |> sendTo(Console.Writer.actor)
+    ConsoleReader.actor ! ConsoleReader.Subscribe(consoleIt)
   }
 
 }
