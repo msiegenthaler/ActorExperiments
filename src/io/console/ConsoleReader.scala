@@ -32,7 +32,7 @@ object ConsoleReader extends ActorImplementor {
       if (stateRef.compareAndSet(s, State(true, sub :: s.subs))) () //added to state
       else addNewSubscriber(sub)
     } else {
-      if (stateRef.compareAndSet(s, State(true, Nil))) Thread(run(sub :: s.subs))
+      if (stateRef.compareAndSet(s, State(true, Nil))) Thread(namedExecution("ConsoleReader")(run(sub :: s.subs)))
       else addNewSubscriber(sub)
     }
   }

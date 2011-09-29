@@ -2,7 +2,7 @@ package io.console
 
 import annotation._
 import actor._
-import execution.DaemonThread
+import execution._
 import java.util.concurrent._
 
 object ConsoleWriter extends ActorImplementor {
@@ -18,5 +18,5 @@ object ConsoleWriter extends ActorImplementor {
     if (s != null) Console.println(s)
     run
   }
-  DaemonThread(run)
+  DaemonThread(namedExecution("ConsoleWriter")(run))
 }
