@@ -20,3 +20,14 @@ object Pooled extends ExecutionStrategy {
 object Thread extends ExecutionStrategy {
   override def apply(f: ⇒ Unit) = new Thread(new Runnable { override def run = f }).start
 }
+object DaemonThread extends ExecutionStrategy {
+  override def apply(f: ⇒ Unit) = Thread {
+    new Thread {
+      setName("Daemon-" + getName())
+      setDaemon(true)
+      override def run = {
+        f
+      }
+    }.start
+  }
+}

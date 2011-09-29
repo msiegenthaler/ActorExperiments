@@ -7,29 +7,9 @@ import IterateeFun._
 import execution._
 import annotation._
 import io.console.ConsoleReader
+import io.console.ConsoleWriter
 
 object IOTest extends MainActor {
-
-  object Console extends ActorImplementor {
-    object Writer {
-      val actor: Actor[String] = new ActorImpl[String] {
-        override def processMessage(m: String) = {
-          queue offer m
-          Noop
-        }
-      }
-
-      private val queue = new java.util.concurrent.LinkedBlockingQueue[String]
-      start
-      private def start = Thread {
-        while (true) {
-          val line = queue.take
-          println(line)
-        }
-      }
-    }
-  }
-
   def worder = {
     def string(chars: List[Char]) = new String(chars.reverse.toArray)
     def wf(buffer: List[Char])(in: Input[Char]): Iteratee[Char, String] = in match {
@@ -141,7 +121,7 @@ object IOTest extends MainActor {
     println("--------------")
 
     println("Enter input: ")
-    val consoleIt = unit[String] |> mapping(s ⇒ (s + "\n").toList) |> traverse |> worder |> sendTo(Console.Writer.actor)
+    val consoleIt = unit[String] |> mapping(s ⇒ (s + "\n").toList) |> traverse |> worder |> sendTo(ConsoleWriter.actor)
     ConsoleReader.actor ! ConsoleReader.Subscribe(consoleIt)
   }
 
